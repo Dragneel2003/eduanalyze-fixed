@@ -155,7 +155,7 @@ app.get("/download/:filename", requireAuth, (req, res) => {
 });
 
 // ─── Utility: PDF → Base64 Images via pdf-poppler ────────────────────────────
-const { fromPath } = require("pdf2pic");
+const pdf2pic = require("pdf2pic");
 
 async function pdfToBase64Images(pdfPath) {
   try {
@@ -171,7 +171,7 @@ async function pdfToBase64Images(pdfPath) {
       height: 800
     };
 
-    const convert = fromPath(pdfPath, options);
+    const convert = pdf2pic.fromPath(pdfPath, options);
     const pages = await convert.bulk(-1);
 
     const images = pages.map(p => {
