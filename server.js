@@ -155,35 +155,35 @@ app.get("/download/:filename", requireAuth, (req, res) => {
 });
 
 // ─── Utility: PDF → Base64 Images via pdf-poppler ────────────────────────────
-const pdf2pic = require("pdf2pic");
-
 async function pdfToBase64Images(pdfPath) {
   try {
+    const poppler = require("pdf-poppler");
     const outputDir = path.join(UPLOADS_DIR, "img_" + Date.now());
     fs.mkdirSync(outputDir, { recursive: true });
 
-    const options = {
-      density: 100,
-      saveFilename: "page",
-      savePath: outputDir,
-      format: "png",
-      width: 600,
-      height: 800
+    const opts = {
+      format: "jpeg",
+      out_dir: outputDir,
+      out_prefix: "page",
+      page: null,
+      scale: 1024,
     };
 
-    const convert = pdf2pic.fromPath(pdfPath, options);
-    const pages = await convert.bulk(-1);
+    await poppler.convert(pdfPath, opts);
 
-    const images = pages.map(p => {
-      const data = fs.readFileSync(p.path);
+    const files = fs
+      .readdirSync(outputDir)
+      .filter((f) => f.endsWith(".jpg") || f.endsWith(".jpeg"))
+      .sort();
+
+    const images = files.map((f) => {
+      const data = fs.readFileSync(path.join(outputDir, f));
       return data.toString("base64");
     });
 
-    // cleanup
+    // Cleanup temp images
     fs.rmSync(outputDir, { recursive: true, force: true });
-
     return images;
-
   } catch (err) {
     console.error("PDF to image error:", err.message);
     return [];
@@ -317,43 +317,10 @@ OUTPUT ONLY VALID JSON (no markdown, no explanation):
   });
   
 
-  const raw = response.choices[0].message.content?.trim() || "";
-
-try {
+  const raw = response.choices[0].message.content.trim();
+  // Strip markdown fences if present
   const cleaned = raw.replace(/```json|```/g, "").trim();
   return JSON.parse(cleaned);
-
-} catch (parseErr) {
-  console.error("❌ JSON parse failed:", raw);
-
-  // fallback safe response
-  return {
-    total_marks: 45,
-    max_marks: 100,
-    percentage: 45,
-    grade: "C",
-    strong_areas: [
-      {
-        topic: "Basic Understanding",
-        description: "Student shows partial understanding."
-      }
-    ],
-    needs_improvement: [
-      {
-        topic: "Concept Clarity",
-        description: "Needs improvement in multiple areas."
-      }
-    ],
-    actionable_feedback: [
-      {
-        topic: "Practice",
-        description: "Revise and practice more questions."
-      }
-    ],
-    overall_performance:
-      "AI response formatting issue occurred, fallback evaluation used."
-  };
-}
 }
 
 // ─── Utility: Score Calibration ───────────────────────────────────────────────
@@ -619,8 +586,11 @@ app.post(
       console.log(`  ${qpImages.length} pages converted`);
 
       if (qpImages.length === 0) {
-  console.warn("⚠️ PDF conversion failed, using fallback");
-}
+        return res.status(400).json({
+          error:
+            "Could not convert question paper PDF to images. Ensure poppler-utils is installed on the server.",
+        });
+      }
 
       // Step 3: Process each answer sheet
       const results = [];
@@ -649,48 +619,16 @@ app.post(
         // Convert answer sheet to images
         const asImages = await pdfToBase64Images(answerFile.path);
         if (asImages.length === 0) {
-  console.warn(`⚠️ Conversion failed for ${origName}, using fallback`);
-}
+          errors.push({ file: origName, error: "Could not convert answer sheet" });
+          continue;
+        }
 
         // AI Evaluation
         let aiResult;
-       try {
-  console.log("🤖 Running AI evaluation...");
-
-  if (qpImages.length > 0 && asImages.length > 0) {
-    aiResult = await evaluateWithAI(qpImages, asImages);
-  } else {
-    console.log("⚠️ Skipping AI (images missing), using fallback");
-
-    aiResult = {
-      total_marks: 50,
-      max_marks: 100,
-      percentage: 50,
-      grade: "C",
-      strong_areas: [
-        {
-          topic: "Basic Understanding",
-          description: "Student shows partial understanding of concepts."
-        }
-      ],
-      needs_improvement: [
-        {
-          topic: "Concept Clarity",
-          description: "Some topics need improvement."
-        }
-      ],
-      actionable_feedback: [
-        {
-          topic: "Practice",
-          description: "Revise concepts and practice more questions."
-        }
-      ],
-      overall_performance:
-        "Evaluation limited due to processing constraints."
-    };
-  }
-
-}catch (aiErr) {
+        try {
+          console.log(`  🤖 Running AI evaluation...`);
+          aiResult = await evaluateWithAI(qpImages, asImages);
+        } catch (aiErr) {
           console.error(`  ❌ AI evaluation failed:`, aiErr.message);
           // Fallback JSON
           aiResult = {
