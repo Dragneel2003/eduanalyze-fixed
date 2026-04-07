@@ -13,7 +13,7 @@ const OpenAI = require("openai");
 // ─── App Setup ───────────────────────────────────────────────────────────────
 const app = express();
 const PORT = process.env.PORT || 3000;
-const BASE_URL = process.env.BASE_URL || `http://localhost:${PORT}`;
+const BASE_URL = process.env.BASE_URL;
 
 // Absolute paths — works regardless of cwd
 const OUTPUTS_DIR = path.join(__dirname, "outputs");
@@ -36,6 +36,10 @@ app.use(express.json());
 app.use(express.urlencoded({ extended: true }));
 app.use(express.static(path.join(__dirname, "public")));
 app.use('/outputs', express.static(path.join(__dirname, 'outputs')));
+// Root route (ADD THIS)
+app.get("/", (req, res) => {
+  res.send("EduAnalyze Backend Running ✅");
+});
 
 app.use(
   session({
@@ -753,8 +757,7 @@ app.get("/health", (req, res) => {
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
-app.listen(PORT, () => {
-  console.log(`\n🚀 EduAnalyze Vision running on port ${PORT}`);
-  console.log(`📊 Dashboard: http://localhost:${PORT}`);
-  console.log(`🔐 Default password: admin123 (change immediately!)\n`);
+app.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 EduAnalyze Vision running on port ${PORT}`);
+  console.log(`🌐 Live URL: ${process.env.BASE_URL || "Not set yet"}`);
 });
