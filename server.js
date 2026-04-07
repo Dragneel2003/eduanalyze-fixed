@@ -9,6 +9,10 @@ const xlsx = require("xlsx");
 const PDFDocument = require("pdfkit");
 const axios = require("axios");
 const OpenAI = require("openai");
+const { exec } = require("child_process");
+const util = require("util");
+const execPromise = util.promisify(exec);
+
 
 // ─── App Setup ───────────────────────────────────────────────────────────────
 const app = express();
@@ -161,24 +165,19 @@ app.get("/download/:filename", requireAuth, (req, res) => {
 // ─── Utility: PDF → Base64 Images via pdf-poppler ────────────────────────────
 async function pdfToBase64Images(pdfPath) {
   try {
-    const poppler = require("pdf-poppler");
     const outputDir = path.join(UPLOADS_DIR, "img_" + Date.now());
     fs.mkdirSync(outputDir, { recursive: true });
 
-    const opts = {
-      format: "jpeg",
-      out_dir: outputDir,
-      out_prefix: "page",
-      page: null,
-      scale: 1024,
-    };
-
-    await poppler.convert(pdfPath, opts);
+    await execPromise(`pdftoppm -jpeg -r 150 "${pdfPath}" "${outputDir}/page"`);
 
     const files = fs
       .readdirSync(outputDir)
-      .filter((f) => f.endsWith(".jpg") || f.endsWith(".jpeg"))
-      .sort();
+      .filter((f) => f.includes("page") && (f.endsWith(".jpg") || f.endsWith(".jpeg")))
+      .sort((a, b) => {
+        const numA = parseInt(a.match(/-(\d+)\.jpg$/)?.[1] || 0);
+        const numB = parseInt(b.match(/-(\d+)\.jpg$/)?.[1] || 0);
+        return numA - numB;
+     });
 
     const images = files.map((f) => {
       const data = fs.readFileSync(path.join(outputDir, f));
