@@ -12,7 +12,7 @@ const OpenAI = require("openai");
 
 // ─── App Setup ───────────────────────────────────────────────────────────────
 const app = express();
-const PORT = process.env.PORT || 3000;
+const PORT = process.env.PORT || 8080;
 const BASE_URL = process.env.BASE_URL;
 
 // Absolute paths — works regardless of cwd
@@ -757,7 +757,8 @@ app.get("/health", (req, res) => {
 });
 
 // ─── Start Server ─────────────────────────────────────────────────────────────
+console.log("ENV PORT:", process.env.PORT);
 app.listen(PORT, "0.0.0.0", () => {
-  console.log(`🚀 EduAnalyze Vision running on port ${PORT}`);
-  console.log(`🌐 Live URL: ${process.env.BASE_URL || "Not set yet"}`);
+  console.log("ENV PORT:", process.env.PORT);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
