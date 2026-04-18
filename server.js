@@ -389,37 +389,37 @@ doc.text(`Student Name: ${studentName}`, 0, y, {
 });
 
 // RIGHT → MARKS
-let rightX = 350;
-let rightY = y;
+// let rightX = 350;
+// let rightY = y;
 
-doc.font("Helvetica-Bold").fontSize(16);
-doc.text(`Marks: ${result.total_marks}/${result.max_marks}`, rightX, rightY, {
-  width: 200,
-  align: "right"
-});
+// doc.font("Helvetica-Bold").fontSize(16);
+// doc.text(`Marks: ${result.total_marks}/${result.max_marks}`, rightX, rightY, {
+//   width: 200,
+//   align: "right"
+// });
 
-rightY += 20;
+// rightY += 20;
 
-doc.font("Helvetica").fontSize(12);
-doc.text(`Percentage: ${result.percentage}%`, rightX, rightY, {
-  width: 200,
-  align: "right"
-});
+// doc.font("Helvetica").fontSize(12);
+// doc.text(`Percentage: ${result.percentage}%`, rightX, rightY, {
+//   width: 200,
+//   align: "right"
+// });
 
-rightY += 15;
+// rightY += 15;
 
-doc.text(`Grade: ${result.grade}`, rightX, rightY, {
-  width: 200,
-  align: "right"
-});
+// doc.text(`Grade: ${result.grade}`, rightX, rightY, {
+//   width: 200,
+//   align: "right"
+// });
 
-// move down after header
-y += 15;
+// // move down after header
+// y += 15;
 
-doc.text(`Grade: ${result.grade}`, rightX, rightY, {
-  width: 200,
-  align: "right"
-});
+// doc.text(`Grade: ${result.grade}`, rightX, rightY, {
+//   width: 200,
+//   align: "right"
+// });
 y += 40;
 
     y += 30;
