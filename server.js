@@ -12,7 +12,7 @@ const OpenAI = require("openai");
 const { exec } = require("child_process");
 const util = require("util");
 const execPromise = util.promisify(exec);
-const PQueue = require("p-queue").default;
+const PQueue = require("p-queue");
 
 const queue = new PQueue({
   concurrency: 1,
