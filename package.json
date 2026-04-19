@@ -17,7 +17,7 @@
     "openai": "^4.104.0",
     "pdf-poppler": "^0.2.1",
     "pdfkit": "^0.14.0",
-    "xlsx": "^0.18.5"
+    "xlsx": "^0.18.5",
     "p-queue": "^8.0.0"
   },
   "devDependencies": {
