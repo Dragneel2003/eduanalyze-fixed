@@ -17,7 +17,7 @@ const PQueue = require("p-queue").default;
 const queue = new PQueue({
   concurrency: 1,
   interval: 60000,
-  intervalCap: 195000
+  intervalCap: 1
 });
 
 
