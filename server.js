@@ -12,6 +12,13 @@ const OpenAI = require("openai");
 const { exec } = require("child_process");
 const util = require("util");
 const execPromise = util.promisify(exec);
+const PQueue = require("p-queue").default;
+
+const queue = new PQueue({
+  concurrency: 1,
+  interval: 60000,
+  intervalCap: 195000
+});
 
 
 // ─── App Setup ───────────────────────────────────────────────────────────────
@@ -599,122 +606,242 @@ app.post(
       const results = [];
       const errors = [];
 
-      for (const answerFile of answerSheets) {
-        const origName = answerFile.originalname;
-        const rollNo = extractRollNo(origName);
-        const studentName = extractStudentName(origName);
+//       for (const answerFile of answerSheets) {
+//         const origName = answerFile.originalname;
+//         const rollNo = extractRollNo(origName);
+//         const studentName = extractStudentName(origName);
 
-        console.log(`\n🎓 Processing: ${origName} (Roll: ${rollNo})`);
+//         console.log(`\n🎓 Processing: ${origName} (Roll: ${rollNo})`);
 
-        if (!rollNo) {
-          errors.push({
-            file: origName,
-            error: "Could not extract roll number from filename",
-          });
-          continue;
-        }
+//         if (!rollNo) {
+//           errors.push({
+//             file: origName,
+//             error: "Could not extract roll number from filename",
+//           });
+//           continue;
+//         }
 
-        const phone = phoneMapping[rollNo];
-        if (!phone) {
-          console.warn(`  ⚠️  No phone found for roll: ${rollNo}, skipping WhatsApp`);
-        }
+//         const phone = phoneMapping[rollNo];
+//         if (!phone) {
+//           console.warn(`  ⚠️  No phone found for roll: ${rollNo}, skipping WhatsApp`);
+//         }
 
-        // Convert answer sheet to images
-        const asImages = await pdfToBase64Images(answerFile.path);
-        if (asImages.length === 0) {
-          errors.push({ file: origName, error: "Could not convert answer sheet" });
-          continue;
-        }
+//         // Convert answer sheet to images
+//         const asImages = await pdfToBase64Images(answerFile.path);
+//         if (asImages.length === 0) {
+//           errors.push({ file: origName, error: "Could not convert answer sheet" });
+//           continue;
+//         }
 
-        // AI Evaluation
-        let aiResult;
-        try {
-          console.log(`  🤖 Running AI evaluation...`);
-          aiResult = await evaluateWithAI(qpImages, asImages);
-        } catch (aiErr) {
-          console.error(`  ❌ AI evaluation failed:`, aiErr.message);
-          // Fallback JSON
-          aiResult = {
-  total_marks: 40,
-  max_marks: 100,
-  percentage: 40,
-  grade: "D",
-  strong_areas: [
-    {
-      topic: "Basic Understanding",
-      description: "Student shows basic understanding of concepts."
+//         // AI Evaluation
+//         let aiResult;
+//         try {
+//           console.log(`  🤖 Running AI evaluation...`);
+//           aiResult = await evaluateWithAI(qpImages, asImages);
+//         } catch (aiErr) {
+//           console.error(`  ❌ AI evaluation failed:`, aiErr.message);
+//           // Fallback JSON
+//           aiResult = {
+//   total_marks: 40,
+//   max_marks: 100,
+//   percentage: 40,
+//   grade: "D",
+//   strong_areas: [
+//     {
+//       topic: "Basic Understanding",
+//       description: "Student shows basic understanding of concepts."
+//     }
+//   ],
+//   needs_improvement: [
+//     {
+//       topic: "Concept Clarity",
+//       description: "Multiple areas require improvement."
+//     }
+//   ],
+//   actionable_feedback: [
+//     {
+//       topic: "Practice",
+//       description: "Revise concepts and practice regularly."
+//     }
+//   ],
+//   overall_performance:
+//     "Student requires additional support to improve performance."
+// };
+//         }
+
+//         // Calibration
+//         const calibrated = calibrateScore(aiResult);
+//         console.log(
+//           `  ✅ Score: ${calibrated.total_marks}/${calibrated.max_marks} (${calibrated.percentage}%) Grade: ${calibrated.grade}`
+//         );
+
+//         // Generate PDF
+//         let pdfFilename;
+//         try {
+//           pdfFilename = await generatePDFReport(studentName, rollNo, calibrated);
+//           console.log(`  📄 PDF generated: ${pdfFilename}`);
+//         } catch (pdfErr) {
+//           errors.push({ file: origName, error: `PDF generation failed: ${pdfErr.message}` });
+//           continue;
+//         }
+
+//         // Use secure /download route for WhatsApp so URL is predictable and auth-protected
+//         // Note: Meta's servers need a publicly accessible URL to fetch the PDF.
+//         // We use BASE_URL/download/:filename but WhatsApp won't pass cookies,
+//         // so we keep /outputs static for WhatsApp delivery only.
+//         const pdfUrl = `${BASE_URL}/outputs/${pdfFilename}`;
+
+//         // Send WhatsApp (if phone available)
+//         let waStatus = "no_phone";
+//         if (phone) {
+//           try {
+//             await sendWhatsApp(phone, pdfUrl, studentName);
+//             waStatus = "sent";
+//             console.log(`  📲 WhatsApp sent to ${phone}`);
+//           } catch (waErr) {
+//             waStatus = "failed";
+//             console.warn(`  ⚠️  WhatsApp failed: ${waErr.message}`);
+//           }
+//         }
+
+//         // Store report
+//         const report = {
+//           rollNo,
+//           name: studentName,
+//           marks: `${calibrated.total_marks}/${calibrated.max_marks}`,
+//           percentage: calibrated.percentage,
+//           grade: calibrated.grade,
+//           pdfUrl,
+//           pdfFilename,
+//           downloadUrl: `/download/${pdfFilename}`,
+//           whatsappStatus: waStatus,
+//           phone: phone || null,
+//           createdAt: new Date().toISOString(),
+//         };
+
+//         reportStore.unshift(report); // Latest first
+//         results.push(report);
+//       }
+      const tasks = answerSheets.map((answerFile) => {
+  return queue.add(async () => {
+
+    const origName = answerFile.originalname;
+    const rollNo = extractRollNo(origName);
+    const studentName = extractStudentName(origName);
+
+    console.log(`\n🎓 Processing: ${origName} (Roll: ${rollNo})`);
+
+    if (!rollNo) {
+      errors.push({
+        file: origName,
+        error: "Could not extract roll number from filename",
+      });
+      return;
     }
-  ],
-  needs_improvement: [
-    {
-      topic: "Concept Clarity",
-      description: "Multiple areas require improvement."
+
+    const phone = phoneMapping[rollNo];
+    if (!phone) {
+      console.warn(`  ⚠️  No phone found for roll: ${rollNo}, skipping WhatsApp`);
     }
-  ],
-  actionable_feedback: [
-    {
-      topic: "Practice",
-      description: "Revise concepts and practice regularly."
+
+    // Convert answer sheet to images
+    const asImages = await pdfToBase64Images(answerFile.path);
+    if (asImages.length === 0) {
+      errors.push({ file: origName, error: "Could not convert answer sheet" });
+      return;
     }
-  ],
-  overall_performance:
-    "Student requires additional support to improve performance."
-};
-        }
 
-        // Calibration
-        const calibrated = calibrateScore(aiResult);
-        console.log(
-          `  ✅ Score: ${calibrated.total_marks}/${calibrated.max_marks} (${calibrated.percentage}%) Grade: ${calibrated.grade}`
-        );
+    // AI Evaluation
+    let aiResult;
+    try {
+      console.log(`  🤖 Running AI evaluation...`);
+      aiResult = await evaluateWithAI(qpImages, asImages);
+    } catch (aiErr) {
+      console.error(`  ❌ AI evaluation failed:`, aiErr.message);
 
-        // Generate PDF
-        let pdfFilename;
-        try {
-          pdfFilename = await generatePDFReport(studentName, rollNo, calibrated);
-          console.log(`  📄 PDF generated: ${pdfFilename}`);
-        } catch (pdfErr) {
-          errors.push({ file: origName, error: `PDF generation failed: ${pdfErr.message}` });
-          continue;
-        }
-
-        // Use secure /download route for WhatsApp so URL is predictable and auth-protected
-        // Note: Meta's servers need a publicly accessible URL to fetch the PDF.
-        // We use BASE_URL/download/:filename but WhatsApp won't pass cookies,
-        // so we keep /outputs static for WhatsApp delivery only.
-        const pdfUrl = `${BASE_URL}/outputs/${pdfFilename}`;
-
-        // Send WhatsApp (if phone available)
-        let waStatus = "no_phone";
-        if (phone) {
-          try {
-            await sendWhatsApp(phone, pdfUrl, studentName);
-            waStatus = "sent";
-            console.log(`  📲 WhatsApp sent to ${phone}`);
-          } catch (waErr) {
-            waStatus = "failed";
-            console.warn(`  ⚠️  WhatsApp failed: ${waErr.message}`);
+      // ✅ SAME fallback (unchanged)
+      aiResult = {
+        total_marks: 40,
+        max_marks: 100,
+        percentage: 40,
+        grade: "D",
+        strong_areas: [
+          {
+            topic: "Basic Understanding",
+            description: "Student shows basic understanding of concepts."
           }
-        }
+        ],
+        needs_improvement: [
+          {
+            topic: "Concept Clarity",
+            description: "Multiple areas require improvement."
+          }
+        ],
+        actionable_feedback: [
+          {
+            topic: "Practice",
+            description: "Revise concepts and practice regularly."
+          }
+        ],
+        overall_performance:
+          "Student requires additional support to improve performance."
+      };
+    }
 
-        // Store report
-        const report = {
-          rollNo,
-          name: studentName,
-          marks: `${calibrated.total_marks}/${calibrated.max_marks}`,
-          percentage: calibrated.percentage,
-          grade: calibrated.grade,
-          pdfUrl,
-          pdfFilename,
-          downloadUrl: `/download/${pdfFilename}`,
-          whatsappStatus: waStatus,
-          phone: phone || null,
-          createdAt: new Date().toISOString(),
-        };
+    // Calibration
+    const calibrated = calibrateScore(aiResult);
+    console.log(
+      `  ✅ Score: ${calibrated.total_marks}/${calibrated.max_marks} (${calibrated.percentage}%) Grade: ${calibrated.grade}`
+    );
 
-        reportStore.unshift(report); // Latest first
-        results.push(report);
+    // Generate PDF
+    let pdfFilename;
+    try {
+      pdfFilename = await generatePDFReport(studentName, rollNo, calibrated);
+      console.log(`  📄 PDF generated: ${pdfFilename}`);
+    } catch (pdfErr) {
+      errors.push({ file: origName, error: `PDF generation failed: ${pdfErr.message}` });
+      return;
+    }
+
+    const pdfUrl = `${BASE_URL}/outputs/${pdfFilename}`;
+
+    // Send WhatsApp
+    let waStatus = "no_phone";
+    if (phone) {
+      try {
+        await sendWhatsApp(phone, pdfUrl, studentName);
+        waStatus = "sent";
+        console.log(`  📲 WhatsApp sent to ${phone}`);
+      } catch (waErr) {
+        waStatus = "failed";
+        console.warn(`  ⚠️  WhatsApp failed: ${waErr.message}`);
       }
+    }
+
+    // Store report
+    const report = {
+      rollNo,
+      name: studentName,
+      marks: `${calibrated.total_marks}/${calibrated.max_marks}`,
+      percentage: calibrated.percentage,
+      grade: calibrated.grade,
+      pdfUrl,
+      pdfFilename,
+      downloadUrl: `/download/${pdfFilename}`,
+      whatsappStatus: waStatus,
+      phone: phone || null,
+      createdAt: new Date().toISOString(),
+    };
+
+    reportStore.unshift(report);
+    results.push(report);
+
+  });
+});
+
+// 🔥 IMPORTANT: wait for all queue tasks
+await Promise.all(tasks);
 
       // Cleanup temp uploads
       uploadedFiles.forEach((f) => {
