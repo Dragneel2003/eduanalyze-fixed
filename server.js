@@ -323,7 +323,7 @@ for (let attempt = 1; attempt <= 5; attempt++) {
 
     response = await openai.chat.completions.create({
       model: "gpt-4o-mini",
-      max_tokens: 400,
+      max_tokens: 800,
       messages: [
         { role: "system", content: SYSTEM_PROMPT },
         { role: "user", content: contentParts },
