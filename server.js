@@ -15,9 +15,7 @@ const execPromise = util.promisify(exec);
 const PQueue = require("p-queue").default;
 
 const queue = new PQueue({
-  concurrency: 1,
-  interval: 120000,
-  intervalCap: 1
+  concurrency: 1
 });
 
 
@@ -317,14 +315,35 @@ OUTPUT ONLY VALID JSON (no markdown, no explanation):
     });
   });
 
-  const response = await openai.chat.completions.create({
-    model: "gpt-4o-mini",
-    max_tokens: 1000,
-    messages: [
-      { role: "system", content: SYSTEM_PROMPT },
-      { role: "user", content: contentParts },
-    ],
-  });
+ let response;
+
+for (let attempt = 1; attempt <= 5; attempt++) {
+
+  try {
+
+    response = await openai.chat.completions.create({
+      model: "gpt-4o-mini",
+      max_tokens: 400,
+      messages: [
+        { role: "system", content: SYSTEM_PROMPT },
+        { role: "user", content: contentParts },
+      ],
+    });
+
+    break;
+
+  } catch (err) {
+
+    if (err.status === 429) {
+
+      console.log("⏳ Rate limit hit. Waiting 60 seconds...");
+      await new Promise(r => setTimeout(r, 60000));
+
+    } else {
+      throw err;
+    }
+  }
+}
   
 
   const raw = response.choices[0].message.content.trim();
@@ -836,6 +855,8 @@ app.post(
 
     reportStore.unshift(report);
     results.push(report);
+    console.log("⏳ Cooling down for 60 seconds...");
+await new Promise(r => setTimeout(r, 60000));
 
   });
 });
